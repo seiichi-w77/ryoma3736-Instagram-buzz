@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Custom scrollbar */
+@layer utilities {
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-gray-100 rounded-lg;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-lg;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+  }
+}
+
+/* Instagram gradient animation */
+@keyframes instagram-gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.instagram-gradient-animated {
+  background: linear-gradient(
+    270deg,
+    #e4405f,
+    #833ab4,
+    #f77737,
+    #405de6
+  );
+  background-size: 400% 400%;
+  animation: instagram-gradient 15s ease infinite;
+}
+
+/* Card hover effect */
+@layer components {
+  .card {
+    @apply rounded-lg border bg-white shadow-card transition-all;
+  }
+
+  .card:hover {
+    @apply shadow-card-hover;
+  }
+}

@@ -1,0 +1,8 @@
+# Example files
+lib/supabase/examples.ts
+
+# Generated files
+.next
+dist
+build
+node_modules
