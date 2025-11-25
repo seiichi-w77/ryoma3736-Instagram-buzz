@@ -7,12 +7,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST, GET } from '@/app/api/generate/caption/route';
 
-// Mock the Claude AI module
-vi.mock('@/lib/ai/claude', () => ({
-  generateCaption: vi.fn(),
+// Mock the Gemini AI module
+vi.mock('@/lib/ai/gemini', () => ({
+  generateCaptionWithGemini: vi.fn(),
 }));
 
-import { generateCaption } from '@/lib/ai/claude';
+import { generateCaptionWithGemini } from '@/lib/ai/gemini';
 
 describe('POST /api/generate/caption', () => {
   beforeEach(() => {
@@ -27,7 +27,7 @@ describe('POST /api/generate/caption', () => {
       estimatedEngagement: 'high',
     };
 
-    vi.mocked(generateCaption).mockResolvedValue(mockCaption);
+    vi.mocked(generateCaptionWithGemini).mockResolvedValue(mockCaption);
 
     const request = new NextRequest(
       'http://localhost:3000/api/generate/caption',
@@ -66,7 +66,7 @@ describe('POST /api/generate/caption', () => {
       estimatedEngagement: 'medium',
     };
 
-    vi.mocked(generateCaption).mockResolvedValue(mockCaption);
+    vi.mocked(generateCaptionWithGemini).mockResolvedValue(mockCaption);
 
     const request = new NextRequest(
       'http://localhost:3000/api/generate/caption',
@@ -181,7 +181,7 @@ describe('POST /api/generate/caption', () => {
   });
 
   it('should handle Claude API errors', async () => {
-    vi.mocked(generateCaption).mockRejectedValue(
+    vi.mocked(generateCaptionWithGemini).mockRejectedValue(
       new Error('Service unavailable')
     );
 
@@ -211,7 +211,7 @@ describe('POST /api/generate/caption', () => {
       estimatedEngagement: 'low',
     };
 
-    vi.mocked(generateCaption).mockResolvedValue(mockCaption);
+    vi.mocked(generateCaptionWithGemini).mockResolvedValue(mockCaption);
 
     const request = new NextRequest(
       'http://localhost:3000/api/generate/caption',
@@ -237,7 +237,7 @@ describe('POST /api/generate/caption', () => {
       estimatedEngagement: 'high',
     };
 
-    vi.mocked(generateCaption).mockResolvedValue(mockCaption);
+    vi.mocked(generateCaptionWithGemini).mockResolvedValue(mockCaption);
 
     const request = new NextRequest(
       'http://localhost:3000/api/generate/caption',
@@ -264,7 +264,7 @@ describe('POST /api/generate/caption', () => {
       estimatedEngagement: 'low',
     };
 
-    vi.mocked(generateCaption).mockResolvedValue(mockCaption);
+    vi.mocked(generateCaptionWithGemini).mockResolvedValue(mockCaption);
 
     const request = new NextRequest(
       'http://localhost:3000/api/generate/caption',

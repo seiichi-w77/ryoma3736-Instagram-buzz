@@ -7,12 +7,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST, GET } from '@/app/api/generate/threads/route';
 
-// Mock the Claude AI module
-vi.mock('@/lib/ai/claude', () => ({
-  generateThreads: vi.fn(),
+// Mock the Gemini AI module
+vi.mock('@/lib/ai/gemini', () => ({
+  generateThreadsWithGemini: vi.fn(),
 }));
 
-import { generateThreads } from '@/lib/ai/claude';
+import { generateThreadsWithGemini } from '@/lib/ai/gemini';
 
 describe('POST /api/generate/threads', () => {
   beforeEach(() => {
@@ -32,7 +32,7 @@ describe('POST /api/generate/threads', () => {
       callToAction: 'Share your sustainability tips!',
     };
 
-    vi.mocked(generateThreads).mockResolvedValue(mockThreads);
+    vi.mocked(generateThreadsWithGemini).mockResolvedValue(mockThreads);
 
     const request = new NextRequest(
       'http://localhost:3000/api/generate/threads',
@@ -69,7 +69,7 @@ describe('POST /api/generate/threads', () => {
       callToAction: 'Learn more',
     };
 
-    vi.mocked(generateThreads).mockResolvedValue(mockThreads);
+    vi.mocked(generateThreadsWithGemini).mockResolvedValue(mockThreads);
 
     const request = new NextRequest(
       'http://localhost:3000/api/generate/threads',
@@ -164,7 +164,7 @@ describe('POST /api/generate/threads', () => {
   });
 
   it('should handle Claude API errors', async () => {
-    vi.mocked(generateThreads).mockRejectedValue(
+    vi.mocked(generateThreadsWithGemini).mockRejectedValue(
       new Error('Generation failed')
     );
 
@@ -193,7 +193,7 @@ describe('POST /api/generate/threads', () => {
       callToAction: 'Check it out',
     };
 
-    vi.mocked(generateThreads).mockResolvedValue(mockThreads);
+    vi.mocked(generateThreadsWithGemini).mockResolvedValue(mockThreads);
 
     const request = new NextRequest(
       'http://localhost:3000/api/generate/threads',
@@ -219,7 +219,7 @@ describe('POST /api/generate/threads', () => {
       callToAction: 'Action',
     };
 
-    vi.mocked(generateThreads).mockResolvedValue(mockThreads);
+    vi.mocked(generateThreadsWithGemini).mockResolvedValue(mockThreads);
 
     const request = new NextRequest(
       'http://localhost:3000/api/generate/threads',
@@ -246,7 +246,7 @@ describe('POST /api/generate/threads', () => {
       callToAction: 'Read more',
     };
 
-    vi.mocked(generateThreads).mockResolvedValue(mockThreads);
+    vi.mocked(generateThreadsWithGemini).mockResolvedValue(mockThreads);
 
     const request = new NextRequest(
       'http://localhost:3000/api/generate/threads',
@@ -271,7 +271,7 @@ describe('POST /api/generate/threads', () => {
       callToAction: 'Test',
     };
 
-    vi.mocked(generateThreads).mockResolvedValue(mockThreads);
+    vi.mocked(generateThreadsWithGemini).mockResolvedValue(mockThreads);
 
     const tones = ['professional', 'casual', 'funny', 'inspirational'];
 
@@ -301,7 +301,7 @@ describe('POST /api/generate/threads', () => {
       callToAction: 'Test',
     };
 
-    vi.mocked(generateThreads).mockResolvedValue(mockThreads);
+    vi.mocked(generateThreadsWithGemini).mockResolvedValue(mockThreads);
 
     const styles = ['technical', 'storytelling', 'quick-tips'];
 
@@ -331,7 +331,7 @@ describe('POST /api/generate/threads', () => {
       callToAction: 'Test',
     };
 
-    vi.mocked(generateThreads).mockResolvedValue(mockThreads);
+    vi.mocked(generateThreadsWithGemini).mockResolvedValue(mockThreads);
 
     const request = new NextRequest(
       'http://localhost:3000/api/generate/threads',
@@ -357,7 +357,7 @@ describe('POST /api/generate/threads', () => {
       callToAction: 'Check it',
     };
 
-    vi.mocked(generateThreads).mockResolvedValue(mockThreads);
+    vi.mocked(generateThreadsWithGemini).mockResolvedValue(mockThreads);
 
     const request = new NextRequest(
       'http://localhost:3000/api/generate/threads',

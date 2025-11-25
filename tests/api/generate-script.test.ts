@@ -7,12 +7,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST, GET } from '@/app/api/generate/script/route';
 
-// Mock the Claude AI module
-vi.mock('@/lib/ai/claude', () => ({
-  generateReelScript: vi.fn(),
+// Mock the Gemini AI module
+vi.mock('@/lib/ai/gemini', () => ({
+  generateReelScriptWithGemini: vi.fn(),
 }));
 
-import { generateReelScript } from '@/lib/ai/claude';
+import { generateReelScriptWithGemini } from '@/lib/ai/gemini';
 
 describe('POST /api/generate/script', () => {
   beforeEach(() => {
@@ -38,7 +38,7 @@ describe('POST /api/generate/script', () => {
       transitionTips: ['Fade between scenes', 'Use quick cuts'],
     };
 
-    vi.mocked(generateReelScript).mockResolvedValue(mockScript);
+    vi.mocked(generateReelScriptWithGemini).mockResolvedValue(mockScript);
 
     const request = new NextRequest(
       'http://localhost:3000/api/generate/script',
@@ -76,7 +76,7 @@ describe('POST /api/generate/script', () => {
       transitionTips: [],
     };
 
-    vi.mocked(generateReelScript).mockResolvedValue(mockScript);
+    vi.mocked(generateReelScriptWithGemini).mockResolvedValue(mockScript);
 
     const request = new NextRequest(
       'http://localhost:3000/api/generate/script',
@@ -210,7 +210,7 @@ describe('POST /api/generate/script', () => {
   });
 
   it('should handle Claude API errors', async () => {
-    vi.mocked(generateReelScript).mockRejectedValue(
+    vi.mocked(generateReelScriptWithGemini).mockRejectedValue(
       new Error('Claude API error')
     );
 
@@ -240,7 +240,7 @@ describe('POST /api/generate/script', () => {
       transitionTips: [],
     };
 
-    vi.mocked(generateReelScript).mockResolvedValue(mockScript);
+    vi.mocked(generateReelScriptWithGemini).mockResolvedValue(mockScript);
 
     const request = new NextRequest(
       'http://localhost:3000/api/generate/script',
@@ -268,7 +268,7 @@ describe('POST /api/generate/script', () => {
       transitionTips: [],
     };
 
-    vi.mocked(generateReelScript).mockResolvedValue(mockScript);
+    vi.mocked(generateReelScriptWithGemini).mockResolvedValue(mockScript);
 
     const styles = ['educational', 'entertaining', 'tutorial', 'motivational'];
 
@@ -300,7 +300,7 @@ describe('POST /api/generate/script', () => {
       transitionTips: [],
     };
 
-    vi.mocked(generateReelScript).mockResolvedValue(mockScript);
+    vi.mocked(generateReelScriptWithGemini).mockResolvedValue(mockScript);
 
     const request = new NextRequest(
       'http://localhost:3000/api/generate/script',
