@@ -6,6 +6,40 @@
 import { validateInstagramUrl } from './validator';
 
 /**
+ * RapidAPI response structure (Instagram Scraper API v2)
+ * Note: Structure may vary, so we use flexible typing
+ */
+interface RapidAPIResponse {
+  data?: {
+    video_url?: string;
+    items?: Array<{
+      video_url?: string;
+      video_versions?: Array<{ url?: string }>;
+      title?: string;
+      caption?: { text?: string };
+      user?: { username?: string; full_name?: string };
+      owner?: { username?: string };
+      thumbnail_url?: string;
+      image_versions2?: { candidates?: Array<{ url?: string }> };
+      video_duration?: number;
+    }>;
+  };
+  items?: Array<{
+    video_url?: string;
+    video_versions?: Array<{ url?: string }>;
+    title?: string;
+    caption?: { text?: string };
+    user?: { username?: string; full_name?: string };
+    owner?: { username?: string };
+    thumbnail_url?: string;
+    image_versions2?: { candidates?: Array<{ url?: string }> };
+    video_duration?: number;
+  }>;
+  video_url?: string;
+  [key: string]: unknown;
+}
+
+/**
  * Download response with media information
  */
 export interface DownloadResponse {
@@ -16,6 +50,11 @@ export interface DownloadResponse {
   size?: number;
   error?: string;
   timestamp: string;
+  title?: string;
+  author?: string;
+  thumbnail?: string;
+  duration?: number;
+  description?: string;
 }
 
 /**
@@ -115,22 +154,20 @@ export class InstagramDownloader {
     }
 
     try {
-      // In a production environment, you would:
-      // 1. Use Instagram API (if you have access)
-      // 2. Use a third-party service like instagrapi, yt-dlp, or similar
-      // 3. Implement proper media extraction from Instagram's network requests
-      //
-      // For this example, we'll return a simulated response structure
-
       const fileName = this.generateFileName(request);
-      const mediaUrl = await this.fetchMediaUrl(request);
+      const mediaData = await this.fetchMediaUrl(request);
 
       return {
         success: true,
-        mediaUrl,
+        mediaUrl: mediaData.mediaUrl,
         fileName,
         mediaType: 'video/mp4',
-        size: 1024 * 1024 * 5, // Simulated 5MB
+        size: 1024 * 1024 * 5, // Size would need to be fetched from actual media
+        title: mediaData.title,
+        author: mediaData.author,
+        thumbnail: mediaData.thumbnail,
+        duration: mediaData.duration,
+        description: mediaData.description,
         timestamp,
       };
     } catch (error) {
@@ -185,21 +222,121 @@ export class InstagramDownloader {
   }
 
   /**
-   * Fetches the media URL from Instagram
-   * This is a placeholder that would be implemented with actual API calls
+   * Fetches the media URL and metadata from Instagram using RapidAPI
    *
    * @param request - The download request
+   * @returns Object containing mediaUrl and metadata
+   */
+  private async fetchMediaUrl(request: DownloadRequest): Promise<{
+    mediaUrl: string;
+    title?: string;
+    author?: string;
+    thumbnail?: string;
+    duration?: number;
+    description?: string;
+  }> {
+    const apiKey = process.env.RAPIDAPI_KEY;
+
+    if (!apiKey) {
+      throw new Error(
+        'RAPIDAPI_KEY is not configured. Please set it in your environment variables.'
+      );
+    }
+
+    try {
+      // Build the API URL with query parameters
+      const apiUrl = new URL('https://instagram-scraper-api2.p.rapidapi.com/v1/post_info');
+      apiUrl.searchParams.append('code_or_id_or_url', request.url);
+
+      const response = await fetch(apiUrl.toString(), {
+        method: 'GET',
+        headers: {
+          'x-rapidapi-key': apiKey,
+          'x-rapidapi-host': 'instagram-scraper-api2.p.rapidapi.com',
+        },
+        signal: AbortSignal.timeout(this.config.timeout),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          `RapidAPI request failed with status ${response.status}: ${response.statusText}`
+        );
+      }
+
+      const data = await response.json();
+
+      // Extract media information from the API response
+      // The structure may vary, so we need to handle different formats
+      const mediaUrl = this.extractMediaUrl(data, request);
+      const metadata = this.extractMetadata(data);
+
+      return {
+        mediaUrl,
+        ...metadata,
+      };
+    } catch (error) {
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          throw new Error('Request timeout: Instagram API took too long to respond');
+        }
+        throw new Error(`Failed to fetch Instagram media: ${error.message}`);
+      }
+      throw new Error('Failed to fetch Instagram media: Unknown error');
+    }
+  }
+
+  /**
+   * Extracts the media URL from the RapidAPI response
+   *
+   * @param data - The API response data
+   * @param _request - The download request (unused)
    * @returns The media URL
    */
-  private async fetchMediaUrl(request: DownloadRequest): Promise<string> {
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 100));
+  private extractMediaUrl(data: RapidAPIResponse, _request: DownloadRequest): string {
+    // Try different possible locations for the video URL
+    const videoUrl =
+      data?.data?.video_url ||
+      data?.data?.items?.[0]?.video_url ||
+      data?.items?.[0]?.video_versions?.[0]?.url ||
+      data?.video_url;
 
-    const validation = validateInstagramUrl(request.url);
-    const mediaId = validation.mediaId || 'unknown';
+    if (!videoUrl) {
+      throw new Error('No video URL found in Instagram API response');
+    }
 
-    // In production, this would fetch actual media from Instagram
-    return `https://media.cdn.example.com/instagram/${mediaId}/video.${request.format || 'mp4'}`;
+    return videoUrl;
+  }
+
+  /**
+   * Extracts metadata from the RapidAPI response
+   *
+   * @param data - The API response data
+   * @returns Metadata object
+   */
+  private extractMetadata(data: RapidAPIResponse): {
+    title?: string;
+    author?: string;
+    thumbnail?: string;
+    duration?: number;
+    description?: string;
+  } {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const item: any = data?.data?.items?.[0] || data?.items?.[0] || data?.data || {};
+
+    return {
+      title: item.title || item.caption?.text || undefined,
+      author:
+        item.user?.username ||
+        item.owner?.username ||
+        item.user?.full_name ||
+        undefined,
+      thumbnail:
+        item.thumbnail_url ||
+        item.image_versions2?.candidates?.[0]?.url ||
+        undefined,
+      duration: item.video_duration || undefined,
+      description: item.caption?.text || undefined,
+    };
   }
 }
 

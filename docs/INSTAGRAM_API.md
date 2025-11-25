@@ -85,9 +85,9 @@ interface ValidationResult {
 }
 ```
 
-### downloader.ts (217 lines)
+### downloader.ts (353 lines)
 
-**Purpose**: Handles downloading Instagram media with configuration and validation
+**Purpose**: Handles downloading Instagram media using RapidAPI (instagram-scraper-api2)
 
 **Key Classes**:
 - `InstagramDownloader` - Main downloader class
@@ -95,6 +95,9 @@ interface ValidationResult {
   - `validate(request: DownloadRequest): Promise<DownloadResponse>`
   - `download(request: DownloadRequest): Promise<DownloadResponse>`
   - `getMediaInfo(url: string): Promise<DownloadResponse>`
+  - `fetchMediaUrl(request: DownloadRequest)` - Private: Fetch from RapidAPI
+  - `extractMediaUrl(data: RapidAPIResponse)` - Private: Extract video URL
+  - `extractMetadata(data: RapidAPIResponse)` - Private: Extract metadata
 
 **Configuration Options**:
 ```typescript
@@ -125,6 +128,34 @@ interface DownloadResponse {
   size?: number;
   error?: string;
   timestamp: string;
+  // New metadata fields from RapidAPI
+  title?: string;
+  author?: string;
+  thumbnail?: string;
+  duration?: number;
+  description?: string;
+}
+```
+
+**RapidAPI Response Type**:
+```typescript
+interface RapidAPIResponse {
+  data?: {
+    video_url?: string;
+    items?: Array<{
+      video_url?: string;
+      video_versions?: Array<{ url?: string }>;
+      title?: string;
+      caption?: { text?: string };
+      user?: { username?: string; full_name?: string };
+      owner?: { username?: string };
+      thumbnail_url?: string;
+      image_versions2?: { candidates?: Array<{ url?: string }> };
+      video_duration?: number;
+    }>;
+  };
+  items?: Array<{ /* ... */ }>;
+  video_url?: string;
 }
 ```
 
@@ -178,7 +209,13 @@ curl -X POST http://localhost:3000/api/reels/download \
 {
   "success": true,
   "data": {
-    "mediaUrl": "https://media.cdn.example.com/instagram/abc123/video.mp4",
+    "url": "https://scontent.cdninstagram.com/v/...",
+    "title": "Amazing reel!",
+    "description": "Check out this amazing content...",
+    "thumbnail": "https://scontent.cdninstagram.com/v/.../thumbnail.jpg",
+    "duration": 15,
+    "author": "username",
+    "mediaUrl": "https://scontent.cdninstagram.com/v/...",
     "fileName": "instagram_reel_abc123_1764066059693.mp4",
     "mediaType": "video/mp4",
     "size": 5242880
@@ -298,6 +335,10 @@ interface ApiResponse<T> { ... }
 |-------|-------|
 | "Download failed: [message]" | Network/timeout error |
 | "Invalid Instagram URL" | Validation failed |
+| "RAPIDAPI_KEY is not configured..." | Missing API key in environment |
+| "RapidAPI request failed with status..." | API error (rate limit, auth, etc.) |
+| "No video URL found in Instagram API response" | Invalid response structure |
+| "Request timeout: Instagram API took too long..." | API timeout |
 
 ### Rate Limiting & Timeouts
 
@@ -367,27 +408,45 @@ async function downloadInstagram(url: string) {
 
 ### Environment Variables
 
-No special environment variables required. The module works out-of-the-box.
+**Required**:
+```bash
+# RapidAPI Key for Instagram Scraper API 2
+# Get your key at: https://rapidapi.com/restyler/api/instagram-scraper-api2
+RAPIDAPI_KEY=your_rapidapi_key_here
+```
 
-Optional configuration via environment:
+**Optional Configuration**:
 ```bash
 INSTAGRAM_TIMEOUT=30000
 INSTAGRAM_MAX_RETRIES=3
 ```
 
+**Setting up RapidAPI**:
+1. Sign up at [RapidAPI](https://rapidapi.com/)
+2. Subscribe to [Instagram Scraper API 2](https://rapidapi.com/restyler/api/instagram-scraper-api2)
+3. Copy your API key from the dashboard
+4. Add it to your `.env` file
+
+**Rate Limits**:
+- Free tier: Limited requests per month
+- Paid tiers: Vary by plan
+- See [pricing details](https://rapidapi.com/restyler/api/instagram-scraper-api2/pricing)
+
 ## Future Enhancements
 
 ### Phase 2
-- [ ] Authentication with Instagram API
+- [x] ~~Authentication with Instagram API~~ (Implemented with RapidAPI)
+- [x] ~~Metadata extraction (caption, likes)~~ (Implemented: title, author, duration)
+- [x] ~~Thumbnail extraction~~ (Implemented)
 - [ ] Private media support
 - [ ] Batch downloads
 - [ ] Progress tracking
 
 ### Phase 3
-- [ ] Thumbnail extraction
-- [ ] Metadata extraction (caption, likes)
 - [ ] Comment downloading
 - [ ] User info extraction
+- [ ] Caching layer for repeated requests
+- [ ] Retry logic for failed requests
 
 ### Phase 4
 - [ ] Video transcoding
@@ -406,6 +465,21 @@ INSTAGRAM_MAX_RETRIES=3
 - Increase timeout in config
 - Check network connectivity
 - Verify Instagram is accessible
+
+### Issue: "RAPIDAPI_KEY is not configured"
+- Add RAPIDAPI_KEY to your .env file
+- Ensure .env file is in the project root
+- Restart your development server after adding the key
+
+### Issue: "RapidAPI request failed with status 429"
+- You've hit the rate limit for your RapidAPI plan
+- Upgrade your RapidAPI subscription
+- Wait for the rate limit window to reset
+
+### Issue: "No video URL found in Instagram API response"
+- The Instagram post may not contain a video
+- The post may be private or deleted
+- RapidAPI response structure may have changed
 
 ### Issue: Empty response
 - Check request body is valid JSON
@@ -430,5 +504,9 @@ For issues or questions:
 ---
 
 **Last Updated**: 2025-11-25
-**Version**: 1.0.0
-**Status**: Production Ready
+**Version**: 2.0.0
+**Status**: Production Ready (RapidAPI Integration)
+
+**Changelog**:
+- v2.0.0 (2025-11-25): Added RapidAPI integration for real Instagram data
+- v1.0.0 (2025-11-25): Initial implementation with mock data

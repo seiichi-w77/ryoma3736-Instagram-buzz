@@ -221,9 +221,11 @@ export interface GeneratedContent {
 
 /**
  * User Insert/Update Type
+ * Most fields are optional as Supabase handles defaults
  */
-export type UserInsert = Omit<User, 'id' | 'created_at' | 'updated_at'> & {
+export type UserInsert = Partial<Omit<User, 'id' | 'created_at' | 'updated_at'>> & {
   id?: string;
+  email: string; // Required
 };
 
 export type UserUpdate = Partial<UserInsert>;
@@ -231,8 +233,12 @@ export type UserUpdate = Partial<UserInsert>;
 /**
  * Reel Insert/Update Type
  */
-export type ReelInsert = Omit<Reel, 'id' | 'created_at' | 'updated_at'> & {
+export type ReelInsert = Partial<Omit<Reel, 'id' | 'created_at' | 'updated_at'>> & {
   id?: string;
+  user_id: string; // Required
+  instagram_reel_id: string; // Required
+  instagram_url: string; // Required
+  shortcode: string; // Required
 };
 
 export type ReelUpdate = Partial<ReelInsert>;
@@ -240,8 +246,10 @@ export type ReelUpdate = Partial<ReelInsert>;
 /**
  * Template Insert/Update Type
  */
-export type TemplateInsert = Omit<Template, 'id' | 'created_at' | 'updated_at' | 'usage_count' | 'last_used_at'> & {
+export type TemplateInsert = Partial<Omit<Template, 'id' | 'created_at' | 'updated_at' | 'usage_count' | 'last_used_at'>> & {
   id?: string;
+  name: string; // Required
+  category: TemplateCategory; // Required
 };
 
 export type TemplateUpdate = Partial<TemplateInsert>;
@@ -249,8 +257,10 @@ export type TemplateUpdate = Partial<TemplateInsert>;
 /**
  * Generated Content Insert/Update Type
  */
-export type GeneratedContentInsert = Omit<GeneratedContent, 'id' | 'created_at' | 'updated_at'> & {
+export type GeneratedContentInsert = Partial<Omit<GeneratedContent, 'id' | 'created_at' | 'updated_at'>> & {
   id?: string;
+  user_id: string; // Required
+  content_type: ContentType; // Required
 };
 
 export type GeneratedContentUpdate = Partial<GeneratedContentInsert>;

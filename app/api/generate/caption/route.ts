@@ -5,13 +5,15 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { generateCaption } from '@/lib/ai/claude';
+import { generateCaptionWithGemini } from '@/lib/ai/gemini';
 
 /**
  * Request body interface
  */
 interface CaptionGenerationRequest {
-  topic: string;
+  topic?: string;
+  url?: string;
+  content?: string;
   imageType?: 'portrait' | 'landscape' | 'carousel' | 'reel';
   tone?: 'professional' | 'casual' | 'funny' | 'inspirational';
   includeHashtags?: boolean;
@@ -53,12 +55,45 @@ function validateRequest(body: unknown): body is CaptionGenerationRequest {
   const req = body as Record<string, unknown>;
   const maxLength = req.maxLength as number | undefined;
 
-  return (
-    typeof req.topic === 'string' &&
-    req.topic.length > 0 &&
-    req.topic.length <= 500 &&
-    (!maxLength || (typeof maxLength === 'number' && maxLength > 0))
-  );
+  // At least one of topic, url, or content must be provided
+  const hasTopic = typeof req.topic === 'string' && req.topic.length > 0 && req.topic.length <= 500;
+  const hasUrl = typeof req.url === 'string' && req.url.length > 0;
+  const hasContent = typeof req.content === 'string' && req.content.length > 0;
+
+  const hasValidInput = hasTopic || hasUrl || hasContent;
+  const hasValidMaxLength = !maxLength || (typeof maxLength === 'number' && maxLength > 0);
+
+  return hasValidInput && hasValidMaxLength;
+}
+
+/**
+ * Extracts topic from request body (url, content, or topic)
+ */
+function extractTopic(body: CaptionGenerationRequest): string {
+  if (body.topic) {
+    return body.topic;
+  }
+
+  if (body.url) {
+    // Extract domain or last segment of URL as topic
+    try {
+      const urlObj = new URL(body.url);
+      const pathSegments = urlObj.pathname.split('/').filter(seg => seg.length > 0);
+      if (pathSegments.length > 0) {
+        return pathSegments[pathSegments.length - 1].replace(/-/g, ' ');
+      }
+      return urlObj.hostname;
+    } catch {
+      return body.url;
+    }
+  }
+
+  if (body.content) {
+    // Use first 200 chars of content as topic
+    return body.content.substring(0, 200);
+  }
+
+  return 'General topic';
 }
 
 /**
@@ -97,16 +132,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         {
           status: 'error',
           error:
-            'Invalid request body. Required: topic (string, 1-500 chars)',
+            'Invalid request body. Required: topic, url, or content (at least one)',
           timestamp: new Date().toISOString(),
         } as CaptionGenerationResponse,
         { status: 400 }
       );
     }
 
-    // Call Claude API for generation
-    const generationResult = await generateCaption(
-      body.topic,
+    // Extract topic from request
+    const topic = extractTopic(body);
+
+    // Call Gemini API for generation
+    const generationResult = await generateCaptionWithGemini(
+      topic,
       body.imageType || 'portrait',
       body.tone || 'casual',
       body.includeHashtags !== false
@@ -161,7 +199,9 @@ export async function GET(): Promise<NextResponse> {
       method: 'POST',
       description: 'Generate engaging Instagram captions optimized for engagement',
       request: {
-        topic: 'string (1-500 chars) - Required',
+        topic: 'string (1-500 chars) - Optional (if url or content provided)',
+        url: 'string - Optional URL to extract topic from',
+        content: 'string - Optional content to use as topic',
         imageType:
           'string (portrait|landscape|carousel|reel) - Optional (default: portrait)',
         tone: 'string (professional|casual|funny|inspirational) - Optional (default: casual)',

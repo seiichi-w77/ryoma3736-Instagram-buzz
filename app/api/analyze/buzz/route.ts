@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { analyzeBuzz } from '@/lib/ai/claude';
+import { analyzeBuzzWithGemini } from '@/lib/ai/gemini';
 
 /**
  * Request body interface
@@ -92,8 +92,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Call Claude API for analysis
-    const analysisResult = await analyzeBuzz(body.content, {
+    // Call Gemini API for analysis
+    const analysisResult = await analyzeBuzzWithGemini(body.content, {
       likes: body.likes,
       comments: body.comments,
       shares: body.shares,

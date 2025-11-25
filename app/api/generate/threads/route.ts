@@ -5,13 +5,15 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { generateThreads } from '@/lib/ai/claude';
+import { generateThreadsWithGemini } from '@/lib/ai/gemini';
 
 /**
  * Request body interface
  */
 interface ThreadsGenerationRequest {
-  topic: string;
+  topic?: string;
+  url?: string;
+  content?: string;
   tone?: 'professional' | 'casual' | 'funny' | 'inspirational';
   style?: 'technical' | 'storytelling' | 'quick-tips';
   includeHashtags?: boolean;
@@ -44,11 +46,43 @@ function validateRequest(body: unknown): body is ThreadsGenerationRequest {
   }
 
   const req = body as Record<string, unknown>;
-  return (
-    typeof req.topic === 'string' &&
-    req.topic.length > 0 &&
-    req.topic.length <= 500
-  );
+
+  // At least one of topic, url, or content must be provided
+  const hasTopic = typeof req.topic === 'string' && req.topic.length > 0 && req.topic.length <= 500;
+  const hasUrl = typeof req.url === 'string' && req.url.length > 0;
+  const hasContent = typeof req.content === 'string' && req.content.length > 0;
+
+  return hasTopic || hasUrl || hasContent;
+}
+
+/**
+ * Extracts topic from request body (url, content, or topic)
+ */
+function extractTopic(body: ThreadsGenerationRequest): string {
+  if (body.topic) {
+    return body.topic;
+  }
+
+  if (body.url) {
+    // Extract domain or last segment of URL as topic
+    try {
+      const urlObj = new URL(body.url);
+      const pathSegments = urlObj.pathname.split('/').filter(seg => seg.length > 0);
+      if (pathSegments.length > 0) {
+        return pathSegments[pathSegments.length - 1].replace(/-/g, ' ');
+      }
+      return urlObj.hostname;
+    } catch {
+      return body.url;
+    }
+  }
+
+  if (body.content) {
+    // Use first 200 chars of content as topic
+    return body.content.substring(0, 200);
+  }
+
+  return 'General topic';
 }
 
 /**
@@ -84,16 +118,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         {
           status: 'error',
           error:
-            'Invalid request body. Required: topic (string, 1-500 chars)',
+            'Invalid request body. Required: topic, url, or content (at least one)',
           timestamp: new Date().toISOString(),
         } as ThreadsGenerationResponse,
         { status: 400 }
       );
     }
 
-    // Call Claude API for generation
-    const generationResult = await generateThreads(
-      body.topic,
+    // Extract topic from request
+    const topic = extractTopic(body);
+
+    // Call Gemini API for generation
+    const generationResult = await generateThreadsWithGemini(
+      topic,
       body.tone || 'casual',
       body.style || 'storytelling'
     );
@@ -148,7 +185,9 @@ export async function GET(): Promise<NextResponse> {
       method: 'POST',
       description: 'Generate engaging Threads post content',
       request: {
-        topic: 'string (1-500 chars) - Required',
+        topic: 'string (1-500 chars) - Optional (if url or content provided)',
+        url: 'string - Optional URL to extract topic from',
+        content: 'string - Optional content to use as topic',
         tone: 'string (professional|casual|funny|inspirational) - Optional',
         style: 'string (technical|storytelling|quick-tips) - Optional',
         includeHashtags: 'boolean - Optional (default: true)',

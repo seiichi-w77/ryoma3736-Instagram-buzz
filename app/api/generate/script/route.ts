@@ -5,13 +5,15 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { generateReelScript } from '@/lib/ai/claude';
+import { generateReelScriptWithGemini } from '@/lib/ai/gemini';
 
 /**
  * Request body interface
  */
 interface ReelScriptGenerationRequest {
-  topic: string;
+  topic?: string;
+  url?: string;
+  content?: string;
   duration?: number;
   style?: 'educational' | 'entertaining' | 'tutorial' | 'motivational';
   platform?: 'instagram' | 'tiktok' | 'youtube';
@@ -54,12 +56,45 @@ function validateRequest(body: unknown): body is ReelScriptGenerationRequest {
   const req = body as Record<string, unknown>;
   const duration = req.duration as number | undefined;
 
-  return (
-    typeof req.topic === 'string' &&
-    req.topic.length > 0 &&
-    req.topic.length <= 500 &&
-    (!duration || (typeof duration === 'number' && duration > 0 && duration <= 300))
-  );
+  // At least one of topic, url, or content must be provided
+  const hasTopic = typeof req.topic === 'string' && req.topic.length > 0 && req.topic.length <= 500;
+  const hasUrl = typeof req.url === 'string' && req.url.length > 0;
+  const hasContent = typeof req.content === 'string' && req.content.length > 0;
+
+  const hasValidInput = hasTopic || hasUrl || hasContent;
+  const hasValidDuration = !duration || (typeof duration === 'number' && duration > 0 && duration <= 300);
+
+  return hasValidInput && hasValidDuration;
+}
+
+/**
+ * Extracts topic from request body (url, content, or topic)
+ */
+function extractTopic(body: ReelScriptGenerationRequest): string {
+  if (body.topic) {
+    return body.topic;
+  }
+
+  if (body.url) {
+    // Extract domain or last segment of URL as topic
+    try {
+      const urlObj = new URL(body.url);
+      const pathSegments = urlObj.pathname.split('/').filter(seg => seg.length > 0);
+      if (pathSegments.length > 0) {
+        return pathSegments[pathSegments.length - 1].replace(/-/g, ' ');
+      }
+      return urlObj.hostname;
+    } catch {
+      return body.url;
+    }
+  }
+
+  if (body.content) {
+    // Use first 200 chars of content as topic
+    return body.content.substring(0, 200);
+  }
+
+  return 'General topic';
 }
 
 /**
@@ -98,20 +133,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         {
           status: 'error',
           error:
-            'Invalid request body. Required: topic (string, 1-500 chars). Optional: duration (number, 1-300 seconds)',
+            'Invalid request body. Required: topic, url, or content (at least one). Optional: duration (number, 1-300 seconds)',
           timestamp: new Date().toISOString(),
         } as ReelScriptGenerationResponse,
         { status: 400 }
       );
     }
 
+    // Extract topic from request
+    const topic = extractTopic(body);
     const duration = body.duration || 30;
     const style = body.style || 'entertaining';
     const platform = body.platform || 'instagram';
 
-    // Call Claude API for generation
-    const generationResult = await generateReelScript(
-      body.topic,
+    // Call Gemini API for generation
+    const generationResult = await generateReelScriptWithGemini(
+      topic,
       duration,
       style
     );
@@ -166,7 +203,9 @@ export async function GET(): Promise<NextResponse> {
       description:
         'Generate professional Reel scripts with detailed pacing and timing',
       request: {
-        topic: 'string (1-500 chars) - Required',
+        topic: 'string (1-500 chars) - Optional (if url or content provided)',
+        url: 'string - Optional URL to extract topic from',
+        content: 'string - Optional content to use as topic',
         duration: 'number (1-300 seconds) - Optional (default: 30)',
         style:
           'string (educational|entertaining|tutorial|motivational) - Optional',

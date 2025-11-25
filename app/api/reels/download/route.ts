@@ -158,11 +158,18 @@ export async function POST(
       );
     }
 
-    // Return successful response
+    // Return successful response in the format expected by the dashboard
     return NextResponse.json(
       {
         success: true,
         data: {
+          url: downloadResponse.mediaUrl,
+          title: downloadResponse.title,
+          description: downloadResponse.description,
+          thumbnail: downloadResponse.thumbnail,
+          duration: downloadResponse.duration,
+          author: downloadResponse.author,
+          // Also include additional metadata for backward compatibility
           mediaUrl: downloadResponse.mediaUrl,
           fileName: downloadResponse.fileName,
           mediaType: downloadResponse.mediaType,
