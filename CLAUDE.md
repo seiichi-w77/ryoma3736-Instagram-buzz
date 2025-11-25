@@ -1,5 +1,13 @@
 # Instagram-buzz - AI Agent Context
 
+## Fundamental Agent Equation
+
+```
+Agent(Intent, World) = lim_{n→∞} (θₙ_{Learn} ⊗ θₙ_{Integrate} ⊗ θₙ_{Execute} ⊗ θₙ_{Allocate} ⊗ θₙ_{Generate} ⊗ θₙ_{Understand})^n(Intent, World)
+```
+
+---
+
 ## Project Overview
 
 Instagram-buzz is an autonomous development project powered by the Miyabi framework.
