@@ -1,0 +1,33 @@
+{
+  "projectName": "Instagram-buzz",
+  "description": "Autonomous development powered by Miyabi",
+  "version": "0.1.0",
+  "agents": {
+    "enabled": true,
+    "list": [
+      "coordinator",
+      "codegen",
+      "review",
+      "issue",
+      "pr",
+      "deploy"
+    ]
+  },
+  "labels": {
+    "autoLabel": true,
+    "stateLabels": [
+      "state:pending",
+      "state:analyzing",
+      "state:implementing",
+      "state:reviewing",
+      "state:done",
+      "state:blocked"
+    ]
+  },
+  "qualityGate": {
+    "minScore": 80,
+    "requireTests": true,
+    "requireTypeCheck": true,
+    "requireLint": true
+  }
+}
