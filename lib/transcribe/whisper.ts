@@ -11,6 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import OpenAI from 'openai';
 
 const execPromise = promisify(exec);
 
@@ -19,7 +20,7 @@ const execPromise = promisify(exec);
  */
 export interface WhisperConfig {
   apiKey: string;
-  model?: 'tiny' | 'base' | 'small' | 'medium' | 'large';
+  model?: 'whisper-1';
   language?: string;
   temperature?: number;
   responseFormat?: 'json' | 'text' | 'verbose_json';
@@ -55,7 +56,7 @@ export interface TranscriptionSegment {
  * Whisper API client for audio transcription
  */
 export class WhisperClient {
-  private apiKey: string;
+  private openai: OpenAI;
   private model: WhisperConfig['model'];
   private language?: string;
   private temperature: number;
@@ -71,8 +72,8 @@ export class WhisperClient {
       throw new Error('OPENAI_API_KEY is required for Whisper API');
     }
 
-    this.apiKey = config.apiKey;
-    this.model = config.model || 'base';
+    this.openai = new OpenAI({ apiKey: config.apiKey });
+    this.model = config.model || 'whisper-1';
     this.language = config.language;
     this.temperature = config.temperature ?? 0;
     this.responseFormat = config.responseFormat || 'json';
@@ -95,10 +96,10 @@ export class WhisperClient {
     }
 
     try {
-      // Extract audio using ffmpeg
-      // ffmpeg -i input.mp4 -q:a 0 -map a output.mp3
+      // Extract audio using ffmpeg with optimized settings for Whisper
+      // -vn: no video, -acodec libmp3lame: mp3 codec, -ar 16000: 16kHz sample rate
       await execPromise(
-        `ffmpeg -i "${videoPath}" -q:a 0 -map a "${outputPath}" -y`
+        `ffmpeg -i "${videoPath}" -vn -acodec libmp3lame -ar 16000 "${outputPath}" -y`
       );
 
       if (!fs.existsSync(outputPath)) {
@@ -128,40 +129,25 @@ export class WhisperClient {
     }
 
     try {
-      const audioBuffer = fs.readFileSync(audioPath);
-      const formData = new FormData();
+      // Create a readable stream from the file
+      const audioStream = fs.createReadStream(audioPath);
 
-      // Append file to form data
-      const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
-      formData.append('file', blob, path.basename(audioPath));
-      formData.append('model', String(this.model || 'base'));
-      formData.append('temperature', String(this.temperature ?? 0));
-      formData.append(
-        'response_format',
-        verbose ? 'verbose_json' : (this.responseFormat || 'json')
-      );
-
-      if (this.language) {
-        formData.append('language', this.language);
-      }
-
-      // Call Whisper API
-      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        body: formData,
+      // Call Whisper API using OpenAI SDK
+      const transcription = await this.openai.audio.transcriptions.create({
+        file: audioStream,
+        model: this.model || 'whisper-1',
+        language: this.language,
+        temperature: this.temperature,
+        response_format: verbose ? 'verbose_json' : (this.responseFormat || 'json'),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(
-          `Whisper API error: ${error.error?.message || response.statusText}`
-        );
-      }
-
-      const result = await response.json();
+      // Type assertion for verbose_json response
+      const result = transcription as unknown as {
+        text: string;
+        language?: string;
+        duration?: number;
+        segments?: TranscriptionSegment[];
+      };
 
       return {
         text: result.text,
@@ -261,7 +247,7 @@ export class WhisperClient {
  */
 export function createWhisperClient(): WhisperClient {
   const apiKey = process.env.OPENAI_API_KEY;
-  const model = (process.env.WHISPER_MODEL || 'base') as WhisperConfig['model'];
+  const model = (process.env.WHISPER_MODEL || 'whisper-1') as WhisperConfig['model'];
   const language = process.env.WHISPER_LANGUAGE;
   const temperature = process.env.WHISPER_TEMPERATURE
     ? parseFloat(process.env.WHISPER_TEMPERATURE)
@@ -273,4 +259,82 @@ export function createWhisperClient(): WhisperClient {
     language,
     temperature,
   });
+}
+
+/**
+ * Convenience function to transcribe a file (audio or video) from file path
+ *
+ * This function automatically detects the file type and handles:
+ * - Direct audio transcription for audio files
+ * - Audio extraction + transcription for video files
+ * - Temporary file cleanup
+ *
+ * @param filePath - Path to the audio or video file
+ * @param options - Optional transcription settings
+ * @returns Promise with transcription result
+ *
+ * @example
+ * ```typescript
+ * // Basic usage
+ * const result = await transcribeFile('/path/to/video.mp4');
+ * console.log(result.text);
+ *
+ * // With language specification
+ * const result = await transcribeFile('/path/to/video.mp4', { language: 'ja' });
+ *
+ * // With verbose output (includes segments)
+ * const result = await transcribeFile('/path/to/video.mp4', { verbose: true });
+ * console.log(result.segments);
+ * ```
+ */
+export async function transcribeFile(
+  filePath: string,
+  options?: {
+    language?: string;
+    verbose?: boolean;
+    apiKey?: string;
+  }
+): Promise<TranscriptionResult> {
+  // Initialize client with provided API key or environment variable
+  const apiKey = options?.apiKey || process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY is required. Provide it via options or environment variable.');
+  }
+
+  const client = new WhisperClient({
+    apiKey,
+    model: 'whisper-1',
+    language: options?.language,
+    temperature: 0,
+    responseFormat: 'verbose_json',
+  });
+
+  // Determine file type by extension
+  const ext = path.extname(filePath).toLowerCase();
+  const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm'];
+  const audioExtensions = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac'];
+
+  // Verify file exists
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`File not found: ${filePath}`);
+  }
+
+  try {
+    // Process based on file type
+    if (videoExtensions.includes(ext)) {
+      // Video file: extract audio then transcribe
+      return await client.transcribeVideo(filePath, options?.verbose ?? false);
+    } else if (audioExtensions.includes(ext)) {
+      // Audio file: transcribe directly
+      return await client.transcribeAudio(filePath, options?.verbose ?? false);
+    } else {
+      // Unknown extension: try as video (might work with ffmpeg)
+      console.warn(`Unknown file extension ${ext}, attempting video transcription`);
+      return await client.transcribeVideo(filePath, options?.verbose ?? false);
+    }
+  } catch (error) {
+    throw new Error(
+      `Failed to transcribe file ${filePath}: ${(error as Error).message}`
+    );
+  }
 }

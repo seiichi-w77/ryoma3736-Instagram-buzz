@@ -143,8 +143,8 @@ export async function POST(
       maxRetries: 3,
     });
 
-    // Download the media
-    const downloadResponse = await downloader.download(downloadRequest);
+    // Download the media and save to disk
+    const downloadResponse = await downloader.downloadAndSave(downloadRequest);
 
     if (!downloadResponse.success) {
       return NextResponse.json(
@@ -174,6 +174,8 @@ export async function POST(
           fileName: downloadResponse.fileName,
           mediaType: downloadResponse.mediaType,
           size: downloadResponse.size,
+          // NEW: Include file path for transcription pipeline
+          filePath: downloadResponse.filePath,
         },
         timestamp,
         requestId,

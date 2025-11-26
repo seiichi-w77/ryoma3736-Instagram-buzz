@@ -4,7 +4,7 @@
 
 ## 概要
 
-Instagram Buzzは、Claude AI APIを活用して、Instagram向けのコンテンツを分析・生成するサーバーレスAPI群です。
+Instagram Buzzは、Gemini AI APIを活用して、Instagram向けのコンテンツを分析・生成するサーバーレスAPI群です。
 
 ## 実装済みAPI
 
@@ -182,22 +182,22 @@ Instagram投稿用のエンゲージングなキャプションを生成しま�
 
 ## モジュール構成
 
-### Claude APIモジュール
-**ファイル**: `/lib/ai/claude.ts`
+### Gemini AIモジュール
+**ファイル**: `/lib/ai/gemini.ts`
 
-Anthropic Claude APIとの通信を担当します。
+Google Gemini APIとの通信を担当します。
 
 **主要関数**:
-- `callClaude(prompt, options)` - 汎用Claude APIコール
-- `analyzeBuzz(content, metrics)` - バズ分析
-- `generateThreads(topic, tone, style)` - Threads生成
-- `generateReelScript(topic, duration, style)` - リール台本生成
-- `generateCaption(topic, imageType, tone, includeHashtags)` - キャプション生成
+- `callGemini(prompt, options)` - 汎用Gemini APIコール
+- `analyzeBuzzWithGemini(content, metrics)` - バズ分析
+- `generateThreadsWithGemini(topic, tone, style)` - Threads生成
+- `generateReelScriptWithGemini(topic, duration, style)` - リール台本生成
+- `generateCaptionWithGemini(topic, imageType, tone, includeHashtags)` - キャプション生成
 
 ### プロンプトテンプレート
 **ファイル**: `/lib/ai/prompts.ts`
 
-Claude APIへの最適化されたプロンプトテンプレートを提供します。
+Gemini APIへの最適化されたプロンプトテンプレートを提供します。
 
 **テンプレート**:
 - `BUZZ_ANALYSIS_PROMPT` - バズ分析用プロンプト
@@ -215,10 +215,12 @@ Claude APIへの最適化されたプロンプトテンプレートを提供し�
 `.env` ファイルに以下を設定します:
 
 ```env
-ANTHROPIC_API_KEY=sk-ant-your_api_key_here
+GOOGLE_AI_API_KEY=your_google_ai_api_key_here
+# または
+GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
-APIキーは [Anthropic Console](https://console.anthropic.com/) から取得できます。
+APIキーは [Google AI Studio](https://makersuite.google.com/app/apikey) から取得できます。
 
 ---
 
@@ -231,11 +233,11 @@ npm test
 
 ### 特定のテストファイル実行
 ```bash
-npm test lib/__tests__/claude.test.ts
+npm test lib/__tests__/gemini.test.ts
 ```
 
 ### テストファイル一覧
-- `/lib/__tests__/claude.test.ts` - Claude API モジュールテスト
+- `/lib/__tests__/gemini.test.ts` - Gemini API モジュールテスト
 - `/app/api/__tests__/routes.test.ts` - APIルートテスト
 
 ---
@@ -322,7 +324,7 @@ print(f"Buzz Score: {analysis['data']['buzzScore']}")
 ```json
 {
   "status": "error",
-  "error": "ANTHROPIC_API_KEY environment variable is not set",
+  "error": "GOOGLE_AI_API_KEY or GEMINI_API_KEY environment variable is not set",
   "timestamp": "2024-11-25T10:30:00.000Z"
 }
 ```
@@ -345,7 +347,7 @@ print(f"Buzz Score: {analysis['data']['buzzScore']}")
 - **リクエストサイズ**: 最大10MB
 - **トピック長**: 最大500文字
 - **同時リクエスト**: APIキーの制限に準拠
-- **レート制限**: Claude APIの料金プランに依存
+- **レート制限**: Gemini APIの料金プランに依存
 
 ---
 
@@ -353,13 +355,13 @@ print(f"Buzz Score: {analysis['data']['buzzScore']}")
 
 ### API Key エラー
 ```
-Error: ANTHROPIC_API_KEY environment variable is not set
+Error: GOOGLE_AI_API_KEY or GEMINI_API_KEY environment variable is not set
 ```
 → `.env` ファイルに正しいAPI キーを設定してください。
 
-### Claude API エラー
+### Gemini API エラー
 ```
-Error: Claude API error: 401
+Error: Gemini API error: 401
 ```
 → API キーの有効性と有効期限を確認してください。
 
@@ -373,6 +375,6 @@ Error: Request timeout
 
 ## まとめ
 
-Instagram Buzzは、Claude AIの強力なNLPテクノロジーを活用して、Instagram向けのコンテンツ生成を自動化します。4つの主要APIにより、バズ分析、Threads生成、リール台本生成、キャプション生成が可能です。
+Instagram Buzzは、Gemini AIの強力なNLPテクノロジーを活用して、Instagram向けのコンテンツ生成を自動化します。4つの主要APIにより、バズ分析、Threads生成、リール台本生成、キャプション生成が可能です。
 
 詳細は各APIドキュメントを参照してください。

@@ -135,7 +135,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const language = body.language === 'auto' ? undefined : body.language;
     const whisperClient = new WhisperClient({
       apiKey,
-      model: 'base',
+      model: 'whisper-1',
       language,
       temperature: 0,
       responseFormat: 'verbose_json',

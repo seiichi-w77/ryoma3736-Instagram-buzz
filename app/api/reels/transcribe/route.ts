@@ -2,16 +2,23 @@
  * Transcription API Route Handler
  *
  * Handles POST requests for transcribing Instagram Reels audio content.
- * Supports both direct audio uploads and video file processing.
+ * Supports both direct audio/video file uploads and file path references.
  *
  * Endpoint: POST /api/reels/transcribe
- * Content-Type: multipart/form-data
  *
- * Request Parameters:
- * - file: Audio or video file (required)
- * - format: Output format ('text'|'markdown'|'srt'|'script'|'complete') (default: 'text')
- * - verbose: Include detailed segments (boolean, default: false)
- * - language: Language code for transcription (optional, e.g. 'en', 'ja')
+ * Two request modes:
+ *
+ * 1. File Upload (Content-Type: multipart/form-data)
+ *    - file: Audio or video file (required)
+ *    - format: Output format ('text'|'markdown'|'srt'|'script'|'complete') (default: 'text')
+ *    - verbose: Include detailed segments (boolean, default: false)
+ *    - language: Language code for transcription (optional, e.g. 'en', 'ja')
+ *
+ * 2. File Path (Content-Type: application/json)
+ *    - filePath: Path to already downloaded video file (required)
+ *    - format: Output format (optional, default: 'text')
+ *    - verbose: Include detailed segments (optional, default: false)
+ *    - language: Language code for transcription (optional)
  *
  * Response:
  * - 200: Transcription completed successfully
@@ -78,10 +85,12 @@ interface ValidationResult {
   format?: 'text' | 'markdown' | 'srt' | 'script' | 'complete';
   verbose?: boolean;
   language?: string;
+  isTemporary?: boolean; // Whether file needs cleanup
 }
 
 /**
  * Validate incoming request and file
+ * Supports both file upload and filePath parameter
  *
  * @param request - Next.js request object
  * @returns Validation result
@@ -92,7 +101,90 @@ async function validateRequest(request: NextRequest): Promise<ValidationResult> 
     return { valid: false, error: 'Method not allowed. Use POST.' };
   }
 
-  // Parse form data
+  const contentType = request.headers.get('content-type') || '';
+
+  // Handle JSON request with filePath parameter
+  if (contentType.includes('application/json')) {
+    let jsonData: Record<string, unknown>;
+    try {
+      jsonData = await request.json();
+    } catch (error) {
+      return { valid: false, error: 'Failed to parse JSON body' };
+    }
+
+    const filePath = jsonData.filePath;
+    if (!filePath || typeof filePath !== 'string') {
+      return { valid: false, error: 'filePath is required in JSON body' };
+    }
+
+    // Validate file exists
+    if (!fs.existsSync(filePath)) {
+      return { valid: false, error: `File not found: ${filePath}` };
+    }
+
+    // Get file stats
+    let stats;
+    try {
+      stats = fs.statSync(filePath);
+    } catch (error) {
+      return { valid: false, error: 'Failed to read file stats' };
+    }
+
+    // Validate file size
+    if (stats.size > MAX_FILE_SIZE) {
+      return {
+        valid: false,
+        error: `File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB`,
+      };
+    }
+
+    // Warning for large files
+    if (stats.size > WHISPER_MAX_SIZE) {
+      console.warn(
+        `File size (${stats.size / 1024 / 1024}MB) exceeds Whisper API limit (${WHISPER_MAX_SIZE / 1024 / 1024}MB). This may cause issues.`
+      );
+    }
+
+    // Determine mimetype from extension
+    const ext = path.extname(filePath).toLowerCase();
+    const mimetypeMap: Record<string, string> = {
+      '.mp4': 'video/mp4',
+      '.webm': 'video/webm',
+      '.mov': 'video/quicktime',
+      '.avi': 'video/x-msvideo',
+      '.mkv': 'video/x-matroska',
+      '.mp3': 'audio/mpeg',
+      '.wav': 'audio/wav',
+      '.m4a': 'audio/m4a',
+      '.aac': 'audio/aac',
+      '.ogg': 'audio/ogg',
+    };
+    const mimetype = mimetypeMap[ext] || 'video/mp4';
+
+    // Get parameters from JSON
+    const format = (jsonData.format as string) || 'text';
+    if (!['text', 'markdown', 'srt', 'script', 'complete'].includes(format)) {
+      return { valid: false, error: 'Invalid format parameter' };
+    }
+
+    const verbose = jsonData.verbose === true;
+    const language = jsonData.language as string | undefined;
+
+    return {
+      valid: true,
+      file: {
+        path: filePath,
+        mimetype,
+        size: stats.size,
+      },
+      format: format as 'text' | 'markdown' | 'srt' | 'script' | 'complete',
+      verbose,
+      language,
+      isTemporary: false, // Existing file, don't delete
+    };
+  }
+
+  // Handle multipart/form-data with file upload
   let formData: FormData;
   try {
     formData = await request.formData();
@@ -169,6 +261,7 @@ async function validateRequest(request: NextRequest): Promise<ValidationResult> 
     format: format as 'text' | 'markdown' | 'srt' | 'script' | 'complete',
     verbose,
     language,
+    isTemporary: true, // Uploaded file, needs cleanup
   };
 }
 
@@ -179,6 +272,9 @@ async function validateRequest(request: NextRequest): Promise<ValidationResult> 
  * @returns JSON response with transcription result
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  let tempFilePath: string | null = null;
+  let shouldCleanup = false;
+
   try {
     // Validate request
     const validation = await validateRequest(request);
@@ -189,12 +285,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const { file, format, verbose, language } = validation;
+    const { file, format, verbose, language, isTemporary } = validation;
     if (!file) {
       return NextResponse.json(
         { error: 'File validation failed' },
         { status: 400 }
       );
+    }
+
+    // Track temp file for cleanup
+    if (isTemporary) {
+      tempFilePath = file.path;
+      shouldCleanup = true;
     }
 
     // Initialize Whisper client
@@ -208,7 +310,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const whisperClient = new WhisperClient({
       apiKey,
-      model: 'base',
+      model: 'whisper-1',
       language,
       temperature: 0,
       responseFormat: 'verbose_json',
@@ -244,6 +346,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       },
       metadata: {
         fileSize: file.size,
+        filePath: file.path,
         processingTime: `${new Date().toISOString()}`,
       },
     };
@@ -261,8 +364,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 500 }
     );
   } finally {
-    // Clean up uploaded file
-    // Note: In production, implement proper cleanup strategy
+    // Clean up temporary uploaded file only
+    if (shouldCleanup && tempFilePath && fs.existsSync(tempFilePath)) {
+      try {
+        fs.unlinkSync(tempFilePath);
+      } catch (error) {
+        console.warn('Failed to cleanup temp file:', tempFilePath);
+      }
+    }
   }
 }
 

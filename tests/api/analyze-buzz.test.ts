@@ -12,11 +12,89 @@ vi.mock('@/lib/ai/gemini', () => ({
   analyzeBuzzWithGemini: vi.fn(),
 }));
 
+// Mock the buzz analyzer module
+vi.mock('@/lib/ai/buzz-analyzer', () => ({
+  analyzeBuzzPotential: vi.fn(),
+  quickBuzzScore: vi.fn(),
+  extractKeyHooks: vi.fn(),
+  identifyTrendingTopics: vi.fn(),
+  analyzeTranscriptSimplified: vi.fn(),
+  toSimplifiedFormat: vi.fn(),
+}));
+
 import { analyzeBuzzWithGemini } from '@/lib/ai/gemini';
+import { analyzeBuzzPotential, analyzeTranscriptSimplified } from '@/lib/ai/buzz-analyzer';
 
 describe('POST /api/analyze/buzz', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('should analyze transcript text as per Issue #22 requirements', async () => {
+    const mockBuzzResult = {
+      buzzScore: 85,
+      sentiment: 'positive' as const,
+      viralPotential: 'high' as const,
+      keyHooks: [
+        { text: '感情的なフック', hookType: 'emotional' as const, strength: 9 },
+        { text: '具体的な数字', hookType: 'shocking' as const, strength: 8 },
+      ],
+      trendingTopics: [
+        { topic: 'AI活用', relevance: 90, trendStrength: 'trending' as const },
+        { topic: '時短術', relevance: 85, trendStrength: 'viral' as const },
+      ],
+      contentStructure: {
+        openingStrength: 9,
+        retentionFactors: ['ストーリーテリング', '具体例'],
+        callToActionPresent: false,
+        pacing: 'good' as const,
+      },
+      targetAudience: {
+        primaryDemographic: 'ビジネスパーソン',
+        ageRange: '25-40',
+        interests: ['AI', '生産性向上'],
+      },
+      recommendations: [
+        {
+          priority: 'high' as const,
+          category: 'content' as const,
+          suggestion: '冒頭にもっと強いフックを',
+          expectedImpact: 'より高い初回視聴率',
+        },
+        {
+          priority: 'medium' as const,
+          category: 'engagement' as const,
+          suggestion: 'CTAを明確に',
+          expectedImpact: 'コメント率向上',
+        },
+      ],
+      predictedMetrics: {
+        estimatedViews: '50K-100K',
+        estimatedEngagementRate: '8-12%',
+        viralityProbability: 85,
+      },
+    };
+
+    vi.mocked(analyzeBuzzPotential).mockResolvedValue(mockBuzzResult);
+
+    const request = new NextRequest('http://localhost:3000/api/analyze/buzz', {
+      method: 'POST',
+      body: JSON.stringify({
+        transcription: 'これはテスト用の文字起こしテキストです。AIを活用して時短術を紹介しています。',
+        contentType: 'reel',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe('success');
+    expect(data.data.buzzScore).toBe(85);
+    expect(data.data.sentiment).toBe('positive');
+    expect(data.data.keyHooks).toBeDefined();
+    expect(data.data.trendingTopics).toBeDefined();
+    expect(data.data.recommendations).toBeDefined();
   });
 
   it('should analyze buzz for valid content', async () => {
@@ -198,6 +276,38 @@ describe('POST /api/analyze/buzz', () => {
     expect(typeof data.timestamp).toBe('string');
     expect(new Date(data.timestamp).getTime()).toBeGreaterThan(0);
   });
+
+  it('should return simplified format when analysisMode is simplified', async () => {
+    const mockSimplifiedResult = {
+      buzzScore: 85,
+      factors: ['感情的なフック', '具体的な数字', 'ストーリーテリング'],
+      sentiment: 'positive' as const,
+      keyThemes: ['AI活用', '時短術'],
+      recommendations: ['冒頭にもっと強いフックを', 'CTAを明確に'],
+    };
+
+    vi.mocked(analyzeTranscriptSimplified).mockResolvedValue(mockSimplifiedResult);
+
+    const request = new NextRequest('http://localhost:3000/api/analyze/buzz', {
+      method: 'POST',
+      body: JSON.stringify({
+        transcription: 'AIを活用した時短術を紹介します',
+        contentType: 'reel',
+        analysisMode: 'simplified',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.status).toBe('success');
+    expect(data.data.buzzScore).toBe(85);
+    expect(data.data.factors).toEqual(['感情的なフック', '具体的な数字', 'ストーリーテリング']);
+    expect(data.data.sentiment).toBe('positive');
+    expect(data.data.keyThemes).toEqual(['AI活用', '時短術']);
+    expect(data.data.recommendations).toEqual(['冒頭にもっと強いフックを', 'CTAを明確に']);
+  });
 });
 
 describe('GET /api/analyze/buzz', () => {
@@ -230,11 +340,11 @@ describe('GET /api/analyze/buzz', () => {
     const response = await GET();
     const data = await response.json();
 
-    expect(data.response.status).toBeDefined();
-    expect(data.response.data).toBeDefined();
-    expect(data.response.data.buzzScore).toBeDefined();
-    expect(data.response.data.sentiment).toBeDefined();
-    expect(data.response.data.keyThemes).toBeDefined();
-    expect(data.response.data.recommendations).toBeDefined();
+    expect(data.response).toBeDefined();
+    expect(data.response.full).toBeDefined();
+    expect(data.response.full.buzzScore).toBeDefined();
+    expect(data.response.full.sentiment).toBeDefined();
+    expect(data.response.full.keyHooks).toBeDefined();
+    expect(data.response.full.recommendations).toBeDefined();
   });
 });

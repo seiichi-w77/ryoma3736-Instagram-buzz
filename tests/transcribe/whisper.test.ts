@@ -18,7 +18,7 @@ describe('WhisperClient', () => {
   let whisperClient: WhisperClient;
   const testConfig: WhisperConfig = {
     apiKey: 'test-api-key',
-    model: 'base',
+    model: 'whisper-1',
     language: 'en',
     temperature: 0,
   };
@@ -36,7 +36,7 @@ describe('WhisperClient', () => {
       expect(() => {
         new WhisperClient({
           apiKey: '',
-          model: 'base',
+          model: 'whisper-1',
         });
       }).toThrow('OPENAI_API_KEY is required for Whisper API');
     });
@@ -186,16 +186,12 @@ describe('createWhisperClient', () => {
 });
 
 describe('WhisperClient configuration', () => {
-  it('should accept different model sizes', () => {
-    const models = ['tiny', 'base', 'small', 'medium', 'large'] as const;
-
-    models.forEach((model) => {
-      const client = new WhisperClient({
-        apiKey: 'test-key',
-        model,
-      });
-      expect(client).toBeDefined();
+  it('should accept whisper-1 model', () => {
+    const client = new WhisperClient({
+      apiKey: 'test-key',
+      model: 'whisper-1',
     });
+    expect(client).toBeDefined();
   });
 
   it('should accept different response formats', () => {
@@ -204,7 +200,7 @@ describe('WhisperClient configuration', () => {
     formats.forEach((format) => {
       const client = new WhisperClient({
         apiKey: 'test-key',
-        model: 'base',
+        model: 'whisper-1',
         responseFormat: format,
       });
       expect(client).toBeDefined();
@@ -214,7 +210,7 @@ describe('WhisperClient configuration', () => {
   it('should accept temperature between 0 and 1', () => {
     const client = new WhisperClient({
       apiKey: 'test-key',
-      model: 'base',
+      model: 'whisper-1',
       temperature: 0.5,
     });
     expect(client).toBeDefined();
